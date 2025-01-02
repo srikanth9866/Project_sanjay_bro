@@ -1,0 +1,17 @@
+---
+- name: Build and run Docker image using Dockerfile
+  hosts: all
+  collections:
+    - community.docker
+  tasks:
+    - name: Build Docker image from Dockerfile
+      docker_image:
+        name: srikanth0370/batch14
+        tag: Nexus_using_Ansible
+        source: build
+        build:
+          path: /opt
+          dockerfile: Dockerfile
+
+
+# ansible-galaxy collection install community.docker

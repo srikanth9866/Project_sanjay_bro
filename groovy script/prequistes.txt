@@ -1,0 +1,29 @@
+I'll help you create a Groovy script for your Jenkins pipeline that includes all the requested stages with user input before each step.
+
+Jenkins Pipeline with User Input
+
+npm install
+Jenkinsfile
+This Groovy script creates a Jenkins pipeline that:
+
+Asks for confirmation before each major step
+Fetches code from your repository
+Builds the code using npm (adjust build commands as needed)
+Runs SonarQube analysis with quality gate check
+Pushes the artifact to Nexus repository
+To use this pipeline:
+
+Save it as Jenkinsfile in your project's root directory
+Configure these prerequisites in Jenkins:
+Install required plugins: Pipeline, SonarQube Scanner, Nexus Artifact Uploader
+Configure SonarQube and Nexus credentials in Jenkins
+Update the environment variables (NEXUS_URL, SONAR_URL) with your actual URLs
+Configure the Nexus repository details (groupId, repository name)
+The pipeline will prompt for confirmation before each stage, allowing you to control the flow of the deployment process. Each stage can be aborted if the user chooses not to proceed.
+
+Remember to:
+
+Adjust the build commands based on your project type
+Configure the correct Nexus repository details
+Set up the required credentials in Jenkins
+Configure SonarQube server details in Jenkins

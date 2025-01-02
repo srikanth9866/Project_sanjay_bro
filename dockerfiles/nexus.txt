@@ -1,0 +1,50 @@
+FROM amazonlinux:2
+
+# Update system and install dependencies
+RUN yum update -y && \
+    yum install -y \
+    java-17-amazon-corretto-devel \
+    wget \
+    tar \
+    zip \
+    gzip \
+    shadow-utils \
+    procps
+
+# Create nexus user
+RUN useradd -r -m -U -d /opt/nexus -s /bin/bash nexus
+
+# Set environment variables
+ENV NEXUS_VERSION=3.75.1-01
+ENV NEXUS_HOME=/opt/nexus/nexus-${NEXUS_VERSION}
+ENV SONATYPE_WORK=/opt/sonatype-work
+ENV INSTALL_DIR=/opt/nexus
+ENV JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto
+
+# Download and setup Nexus
+RUN mkdir -p ${INSTALL_DIR} && \
+    mkdir -p ${SONATYPE_WORK} && \
+    cd ${INSTALL_DIR} && \
+    wget https://download.sonatype.com/nexus/3/nexus-${NEXUS_VERSION}-unix.tar.gz && \
+    tar xvf nexus-${NEXUS_VERSION}-unix.tar.gz && \
+    rm nexus-${NEXUS_VERSION}-unix.tar.gz && \
+    chown -R nexus:nexus ${INSTALL_DIR} && \
+    chown -R nexus:nexus ${SONATYPE_WORK}
+
+# Configure Nexus runtime
+RUN echo "run_as_user=nexus" > ${NEXUS_HOME}/bin/nexus.rc && \
+    sed -i 's/-Xms2703m/-Xms1024m/g' ${NEXUS_HOME}/bin/nexus.vmoptions && \
+    sed -i 's/-Xmx2703m/-Xmx1024m/g' ${NEXUS_HOME}/bin/nexus.vmoptions && \
+    sed -i 's/-XX:MaxDirectMemorySize=2703m/-XX:MaxDirectMemorySize=1024m/g' ${NEXUS_HOME}/bin/nexus.vmoptions
+
+# Expose Nexus port
+EXPOSE 8081
+
+# Set working directory
+WORKDIR ${NEXUS_HOME}
+
+# Switch to nexus user
+USER nexus
+
+# Start Nexus
+CMD ["bin/nexus", "run"]

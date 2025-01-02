@@ -1,0 +1,141 @@
+pipeline {
+    agent any
+    
+    environment {
+        // Define your environment variables
+        NEXUS_URL = 'http://your-nexus-url'
+        SONAR_URL = 'http://your-sonar-url'
+    }
+    
+    stages {
+        stage('Fetch Code') {
+            steps {
+                script {
+                    def userInput = input(
+                        message: 'Do you want to proceed with fetching the code?',
+                        parameters: [
+                            [$class: 'BooleanParameterDefinition', defaultValue: false, description: '', name: 'proceed']
+                        ]
+                    )
+                    if (userInput) {
+                        // Git checkout step
+                        checkout scm
+                        echo "Code fetched successfully"
+                    } else {
+                        error("Code fetch step aborted by user")
+                    }
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                script {
+                    def userInput = input(
+                        message: 'Do you want to proceed with building the code?',
+                        parameters: [
+                            [$class: 'BooleanParameterDefinition', defaultValue: false, description: '', name: 'proceed']
+                        ]
+                    )
+                    if (userInput) {
+                        // Build steps - adjust based on your project type
+                        sh 'npm install'
+                        sh 'npm run build'
+                        echo "Build completed successfully"
+                    } else {
+                        error("Build step aborted by user")
+                    }
+                }
+            }
+        }
+        
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def userInput = input(
+                        message: 'Do you want to proceed with SonarQube analysis?',
+                        parameters: [
+                            [$class: 'BooleanParameterDefinition', defaultValue: false, description: '', name: 'proceed']
+                        ]
+                    )
+                    if (userInput) {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''
+                                sonar-scanner \
+                                    -Dsonar.projectKey=${JOB_NAME} \
+                                    -Dsonar.sources=. \
+                                    -Dsonar.host.url=${SONAR_URL} \
+                                    -Dsonar.projectName=${JOB_NAME}
+                            '''
+                        }
+                        
+                        // Wait for quality gate
+                        timeout(time: 5, unit: 'MINUTES') {
+                            def qg = waitForQualityGate()
+                            if (qg.status != 'OK') {
+                                error "Quality gate failed: ${qg.status}"
+                            }
+                        }
+                        echo "SonarQube analysis completed successfully"
+                    } else {
+                        error("SonarQube analysis step aborted by user")
+                    }
+                }
+            }
+        }
+        
+        stage('Push to Nexus') {
+            steps {
+                script {
+                    def userInput = input(
+                        message: 'Do you want to proceed with pushing to Nexus?',
+                        parameters: [
+                            [$class: 'BooleanParameterDefinition', defaultValue: false, description: '', name: 'proceed']
+                        ]
+                    )
+                    if (userInput) {
+                        // Read package.json for version
+                        def packageJson = readJSON file: 'package.json'
+                        def version = packageJson.version
+                        
+                        // Create artifact
+                        sh "tar -czf ${JOB_NAME}-${version}.tar.gz dist/"
+                        
+                        // Upload to Nexus
+                        nexusArtifactUploader(
+                            nexusVersion: 'nexus3',
+                            protocol: 'http',
+                            nexusUrl: NEXUS_URL,
+                            groupId: 'com.your.group',
+                            version: version,
+                            repository: 'npm-releases',
+                            credentialsId: 'nexus-credentials',
+                            artifacts: [
+                                [artifactId: JOB_NAME,
+                                 classifier: '',
+                                 file: "${JOB_NAME}-${version}.tar.gz",
+                                 type: 'tar.gz']
+                            ]
+                        )
+                        echo "Artifact pushed to Nexus successfully"
+                    } else {
+                        error("Nexus upload step aborted by user")
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+        always {
+            // Cleanup
+            cleanWs()
+        }
+    }
+}
